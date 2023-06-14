@@ -1,6 +1,7 @@
 import torch
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
+import torchaudio.transforms as T
 
 def griffin_lim(mag_spec, n_fft, hop_length, win_length, window, num_iters=100):
     """Griffin-Lim algorithm for reconstructing a waveform from a magnitude spectrogram.
@@ -133,10 +134,12 @@ def compute_snr(waveform_orig, waveform_reconstructed):
   SNR = signal_energy_db - noise_energy_db
   return SNR
 
-def get_spectrogram_from_waveform(waveform, sample_rate=44100, do_crop=True, crop_dim=(224,224)):
-  hop_length=112
-  n_fft=448
-  win_length=448
+def get_spectrogram_from_waveform(waveform, 
+        hop_length=112, n_fft=448, win_length=448, 
+        sample_rate=44100, do_crop=True, crop_dim=(224,224)):
+  hop_length=int(hop_length)
+  n_fft=int(n_fft)
+  win_length=int(win_length)
   window=torch.hann_window(win_length)
   spec = T.Spectrogram(n_fft=n_fft, 
                       win_length=win_length,
