@@ -347,3 +347,54 @@ def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, 
   axes[1,2].set_title("drum pred")
   axes[2,2].set_title("other+bass pred")
   fig.suptitle(title)
+
+# ------------------------------------------------------------------------------------------------
+def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
+  mix_spec = torch.log(torch.abs(mix_spec))
+  mask_spec = torch.log(torch.abs(mask_spec))
+  sources_spec = torch.log(torch.abs(sources_spec))
+  mix_spec = mix_spec.squeeze().numpy() # gives [3, 224, 224]
+  mask_spec = mask_spec.squeeze().numpy()
+  sources_spec = sources_spec.squeeze().numpy()
+
+  filtered_spec = mix_spec * mask_spec
+
+  max_val = 15 #np.amax(np.maximum(mix_spec, np.maximum(mask_spec, np.maximum(sources_spec, filtered_spec))))
+  min_val = 0 #np.amin(np.maximum(mix_spec, np.minimum(mask_spec, np.minimum(sources_spec, filtered_spec))))
+  print(f"plot_mix_mask_sources: max_val : {max_val}, min_val: {min_val}")
+
+  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
+  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+
+  plt.figure(figsize=(35, 25), dpi=70)
+  fig, axes = plt.subplots(3,4)
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  # replace sr with your sample rate
+  times = np.arange(num_frames) * hop_length / sample_rate  # replace hop_length with your hop length
+
+  axes[0,0].pcolormesh(times, freqs, mix_spec[0,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[1,0].pcolormesh(times, freqs, mix_spec[1,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[2,0].pcolormesh(times, freqs, mix_spec[2,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[0,1].pcolormesh(times, freqs, sources_spec[0,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[1,1].pcolormesh(times, freqs, sources_spec[1,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[2,1].pcolormesh(times, freqs, sources_spec[2,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[0,2].pcolormesh(times, freqs, mask_spec[0,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[1,2].pcolormesh(times, freqs, mask_spec[1,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[2,2].pcolormesh(times, freqs, mask_spec[2,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[0,3].pcolormesh(times, freqs, filtered_spec[0,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[1,3].pcolormesh(times, freqs, filtered_spec[1,:,:], shading='auto', vmin=0, vmax=max_val)
+  axes[2,3].pcolormesh(times, freqs, filtered_spec[2,:,:], shading='auto', vmin=0, vmax=max_val)
+
+  axes[0,0].set_title("mix ch1")
+  axes[1,0].set_title("mix ch2")
+  axes[2,0].set_title("mix mix")
+  axes[0,1].set_title("vocal orig.")
+  axes[1,1].set_title("drum orig.")
+  axes[2,1].set_title("other+bass orig.")
+  axes[0,2].set_title("vocal mask")
+  axes[1,2].set_title("drum mask")
+  axes[2,2].set_title("other+bass mask")
+  axes[0,3].set_title("vocal filtered")
+  axes[1,3].set_title("drum filtered")
+  axes[2,3].set_title("other+bass filtered")
+
+  fig.suptitle(title)
