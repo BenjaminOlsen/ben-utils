@@ -13,8 +13,8 @@ import numpy as np
 # test_dataloader = get_spectrogram_dataloader(test_data),
 # train_dataloader = get_spectrogram_dataloader(train_data)
 class SpectrogramDataset(torch.utils.data.Dataset):
-  def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, spec_dimension=None):
-
+  def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, win_type="hann", spec_dimension=None):
+t
     # We use three channels for the time being because DINOv2 has been trained
     # on RGB image data
 
@@ -25,6 +25,10 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     self.masks = []
     self.titles = []
     self.sample_rate = 44100
+    self.hop_length = hop_length
+    self.n_fft = n_fft
+    self.win_length = win_length
+    self.win_type = win_type
 
     #TODO: assumes all audio are the same length, have to modify this:
     audio_sample_cnt = musdb[0].audio.shape[0]
