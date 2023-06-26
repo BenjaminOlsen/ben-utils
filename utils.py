@@ -402,3 +402,11 @@ def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, 
   axes[2,3].set_title("other+bass filtered")
 
   fig.suptitle(title)
+
+# ------------------------------------------------------------------------------------------------
+def print_tensor_stats(t, title=None):
+  max = torch.max(t)
+  min = torch.min(t)
+  mean = torch.mean(t)
+  std = torch.std(t)
+  print(f"{title} - max: {max:.4f}, min {min:.4f}, mean {mean:.4f}, std: {std:.4f}")
