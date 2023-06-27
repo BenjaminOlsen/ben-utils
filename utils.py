@@ -171,7 +171,21 @@ def griffin_lim(mag_spec, n_fft, hop_length, win_length, window, num_iters=100):
     return waveform
 
 
+# ------------------------------------------------------------------------------------------------
+def plot_complex_spectrogram(spec, sample_rate=22050, hop_length=112, title=None):
+  mag_spec = torch.log(torch.abs(spec))
+  phase_spec = torch.angle(spec)
 
+  num_frames = len(spec[:,0]) # double check this... might be flipped
+  num_freq_bins = len(spec[0,:]) # double check this...
+
+  fig, axes = plt.subplots(1,2)
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  # replace sr with your sample rate
+  times = np.arange(num_frames) * hop_length / sample_rate  # replace hop_length with your hop length
+
+  axes[0].pcolormesh(times, freqs, mag_spec, shading='auto')
+  axes[1].pcolormesh(phase_spec, shading='auto')
+  fig.suptitle(title)
 
 # ------------------------------------------------------------------------------------------------
 def plot_specgram_from_waveform(waveform, n_fft, hop_length, sample_rate=44100, title="Spectrogram"):
