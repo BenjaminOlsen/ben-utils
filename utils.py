@@ -6,14 +6,12 @@ import numpy as np
 
 # ------------------------------------------------------------------------------------------------
 ## This class creates the spectrograms when initialized with the musdb argument
+## power = None -> complex spectrum
+## power = 1    -> magnitude spectrum
+## power = 2    -> power spectrum
 
-# iterate over the stems, we want a spectrogram tensor of each
-# use:
-#
-# test_dataloader = get_spectrogram_dataloader(test_data),
-# train_dataloader = get_spectrogram_dataloader(train_data)
 class SpectrogramDataset(torch.utils.data.Dataset):
-  def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, win_type="hann", spec_dimension=None):
+  def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, win_type="hann", spec_dimension=None, power=1):
 
     # We use three channels for the time being because DINOv2 has been trained
     # on RGB image data
@@ -33,7 +31,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     #TODO: assumes all audio are the same length, have to modify this:
     audio_sample_cnt = musdb[0].audio.shape[0]
     if spec_dimension is None:
-      spec_dimension = (224,224)
+      spec_dimension = (224,224) # default for DINOv2
     else:
       n_fft = 2 * spec_dimension[1]
       hop_length=int(audio_sample_cnt / (2 * spec_dimension[0]))
@@ -56,7 +54,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                                                           win_length=win_length,
                                                           sample_rate=sample_rate,
                                                           do_crop=True,
-                                                          crop_dim=spec_dimension)
+                                                          crop_dim=spec_dimension,
+                                                          power=power)
 
       x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
       mixture_spec_mix = get_spectrogram_from_waveform(waveform=x,
@@ -65,7 +64,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                                                         win_length=win_length,
                                                         sample_rate=sample_rate,
                                                         do_crop=True,
-                                                       crop_dim=spec_dimension)
+                                                        crop_dim=spec_dimension,
+                                                        power=power)
 
       # VOCALS
       stem_idx = 4
@@ -77,7 +77,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                                                   win_length=win_length,
                                                   sample_rate=sample_rate,
                                                   do_crop=True,
-                                                 crop_dim=spec_dimension)
+                                                  crop_dim=spec_dimension,
+                                                  power=power)
 
       # DRUMS
       stem_idx = 1
@@ -89,7 +90,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                                                 win_length=win_length,
                                                 sample_rate=sample_rate,
                                                 do_crop=True,
-                                                crop_dim=spec_dimension)
+                                                crop_dim=spec_dimension,
+                                                power=power)
 
       # OTHER
       other_stem_idx = 3
@@ -105,7 +107,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                                                 win_length=win_length,
                                                 sample_rate=sample_rate,
                                                 do_crop=True,
-                                                 crop_dim=spec_dimension)
+                                                crop_dim=spec_dimension,
+                                                power=power)
 
       # stack tensors to be [1, 3, 224, 224] shapes:
       # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
@@ -263,7 +266,7 @@ def compute_snr(waveform_orig, waveform_reconstructed):
 # ------------------------------------------------------------------------------------------------
 def get_spectrogram_from_waveform(waveform, 
         hop_length=112, n_fft=448, win_length=448, 
-        sample_rate=44100, do_crop=True, crop_dim=(224,224)):
+        sample_rate=44100, do_crop=True, crop_dim=(224,224), power=1):
   hop_length=int(hop_length)
   n_fft=int(n_fft)
   win_length=int(win_length)
@@ -271,7 +274,7 @@ def get_spectrogram_from_waveform(waveform,
   spec = T.Spectrogram(n_fft=n_fft, 
                       win_length=win_length,
                       hop_length=hop_length,
-                      power=1) # power=None for complex spectrum; 1: mag; 2: power
+                      power=power) # power=None for complex spectrum; 1: mag; 2: power
 
   resample_rate = int(44100/2)
   #print(f"resampled at: {resample_rate} Hz")
