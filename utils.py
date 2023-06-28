@@ -422,8 +422,10 @@ def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, 
 
 # ------------------------------------------------------------------------------------------------
 def print_tensor_stats(t, title=None):
+  tensor_type = t.dtype
+  t = torch.abs(t)
   max = torch.max(t)
   min = torch.min(t)
   mean = torch.mean(t)
   std = torch.std(t)
-  print(f"{title} - max: {max:.4f}, min {min:.4f}, mean {mean:.4f}, std: {std:.4f}")
+  print(f"{title} - {tensor_type} (magnitude) max: {max:.4f}, min {min:.4f}, mean {mean:.4f}, std: {std:.4f}")
