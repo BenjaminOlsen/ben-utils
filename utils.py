@@ -104,8 +104,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
 
 
 # ------------------------------------------------------------------------------------------------
-def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0,
-        hop_length=112, n_fft=448, win_length=448,
+def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, win_length=448,
         sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224)):
     """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
     
