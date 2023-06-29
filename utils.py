@@ -112,7 +112,8 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
     """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
     
     stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, max(stop_idx, len(musdb_data)))
-    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx])):
+    slice = musdb_data[start_idx:stop_idx]
+    for track_idx, track in tqdm(enumerate(slice)):
       track_name = track.name
       print(f"Getting spectrograms for track {track_idx}/{stop_idx-start_idx}: {track_name}")
       dest = os.path.join(save_dir, f'spectrogram_{track_idx}.pth')
