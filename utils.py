@@ -108,10 +108,11 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
 
 # ------------------------------------------------------------------------------------------------
 def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, win_length=448,
-        sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224), start_idx=0):
+        sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224), start_idx=0, stop_idx=None):
     """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
     
-    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:])):
+    stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, max(stop_idx, len(musdb_data)))
+    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx])):
       track_name = track.name
       print(f"Getting spectrograms for track {track_idx}/{len(musdb_data)}: {track_name}")
       mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
