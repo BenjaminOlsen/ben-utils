@@ -114,7 +114,7 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
     stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, max(stop_idx, len(musdb_data)))
     for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx])):
       track_name = track.name
-      print(f"Getting spectrograms for track {track_idx}/{len(musdb_data)}: {track_name}")
+      print(f"Getting spectrograms for track {track_idx}/{stop_idx-start_idx}: {track_name}")
       mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
                                                                           n_fft=n_fft,
                                                                           win_length=win_length,
