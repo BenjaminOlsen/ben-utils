@@ -51,7 +51,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     stem_idx = 4
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-    print(f"vocal waveform shape: {x.shape}")
+    #print(f"vocal waveform shape: {x.shape}")
     vocal_spec = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
@@ -101,16 +101,17 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
     mix_num_bytes = mix_tensor.element_size() * mix_tensor.numel()
     mask_num_bytes = mask_tensor.element_size() * mask_tensor.numel()
-    print(f"mix_tensor shape: {mix_tensor.shape} -> {mix_num_bytes} bytes, mask_tensor shape: {mask_tensor.shape} -> {mask_num_bytes} bytes")
+    mb = (mix_num_bytes + mask_num_bytes) / (1024**2)
+    print(f"power: {power}; mix_tensor shape: {mix_tensor.shape}, mask_tensor shape: {mask_tensor.shape} -> {mb} MB")
     return mix_tensor, mask_tensor, track_name
 
 
 # ------------------------------------------------------------------------------------------------
 def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, win_length=448,
-        sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224)):
+        sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224), start_idx=0):
     """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
     
-    for track_idx, track in tqdm(enumerate(musdb_data)):
+    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:])):
       track_name = track.name
       print(f"Getting spectrograms for track {track_idx}/{len(musdb_data)}: {track_name}")
       mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
@@ -176,6 +177,10 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
     def __init__(self, data_path):
       self_data_path = data_path
       self.spectrogram_paths = glob.glob(os.path.join(data_path, "*.pth"))
+      self.verbose = False
+
+    def set_verbose(self, verbose=True):
+      self.verbose = verbose
 
     def __len__(self):
       return len(self.spectrogram_paths)
@@ -183,7 +188,26 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
     def __getitem__(self, idx):
       data = torch.load(self.spectrogram_paths[idx])
       mix_spec = data["mix_tensor"]
-      masks_spec = data["mask_tensor"]
+
+      # N.B. The so called "mask tensor" in the dataset is actually just the sources' spectrograms
+      # -> have to maskify it
+
+      # Wiener filter: 
+      sources_spec = data["mask_tensor"]
+      # if complex spectrum:
+      if sources_spec.dtype is torch.complex64 or sources_spec.dtype is torch.complex32:
+        if self.verbose:
+          print("__getitem__ - complex spectrum")
+        masks_spec = torch.square(torch.abs(sources_spec))
+        masks_spec = torch.div(masks_spec, torch.square(torch.abs(sources_spec))) # mask1 = abs(s1)**2 / abs(mix)**2
+      else: # assume POWER spectrum
+        if self.verbose:
+          print("__getitem__ - power spectrum")
+        masks_spec = torch.div(sources_spec, mix_spec)
+      # else: # magnitude spectrum
+      #   print("__getitem__ - magnitude spectrum")
+      #   masks_spec = torch.div(torch.square(torch.abs(sources_spec)), torch.square(torch.abs(mix_spec)))
+    
       track_title = data["title"]
       track_idx = data["idx"]
       return mix_spec, masks_spec, track_title, track_idx
