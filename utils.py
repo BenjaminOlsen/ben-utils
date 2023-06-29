@@ -114,7 +114,8 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
     stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, min(stop_idx, len(musdb_data)))
 
     spec_type = "complex" if power == None else "magnitude" if power == 1 else "power"
-    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx])):
+
+    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx], start=start_idx)):
       track_name = track.name
       print(f"Getting spectrograms for track {track_idx}/{stop_idx-start_idx}: {track_name}")
       dest = os.path.join(save_dir, f'spec_{track_idx}_{spec_type}_len{spec_len_in_s}_nfft{n_fft}_win{win_length}_sr22050.pth')
