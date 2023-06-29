@@ -21,7 +21,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     stem_idx = 0
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     
-    print(f"mix waveform shape: {x.shape}")
+    #print(f"mix waveform shape: {x.shape}")
     mixture_spec_stereo = get_long_specs(waveform=x,
                                           n_fft=n_fft,
                                           win_length=win_length,
@@ -31,10 +31,10 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                           power=power)
     
     mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
-    print(f"mix spec shape: {mixture_spec_stereo.shape}")
+    #print(f"mix spec shape: {mixture_spec_stereo.shape}")
     
     x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-    print(f"mix sum waveform shape: {x.shape}")
+    #print(f"mix sum waveform shape: {x.shape}")
     mixture_spec_mix = get_long_specs(waveform=x,
                                       n_fft=n_fft,
                                       win_length=win_length,
@@ -44,7 +44,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                       power=power)
     
     mixture_spec_mix = mixture_spec_mix.permute(1,2,3,0) # channel, time, freq, spec_idx
-    print(f"mix mix spec shape: {mixture_spec_mix.shape}")
+    #print(f"mix mix spec shape: {mixture_spec_mix.shape}")
 
     
     # VOCALS
@@ -60,12 +60,12 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                 crop_dim=spec_dimension,
                                 power=power)
     vocal_spec = vocal_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-    print(f"vocal_spec shape: {vocal_spec.shape}")
+    #print(f"vocal_spec shape: {vocal_spec.shape}")
     # DRUMS
     stem_idx = 1
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-    print(f"drum waveform shape: {x.shape}")
+    #print(f"drum waveform shape: {x.shape}")
     drum_spec = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
@@ -74,7 +74,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                 crop_dim=spec_dimension,
                                 power=power)
     drum_spec = drum_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-    print(f"drum_spec shape: {drum_spec.shape}")
+    #print(f"drum_spec shape: {drum_spec.shape}")
     # OTHER
     other_stem_idx = 3
     bass_stem_idx = 2
@@ -83,7 +83,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x2 = torch.Tensor(track.stems[bass_stem_idx].T).type(torch.float)
     x2 = (x2[0,:]+x2[1,:]).unsqueeze(dim=0)
     x = (x1 + x2) / 2
-    print(f"other waveform shape: {x.shape}")
+    #print(f"other waveform shape: {x.shape}")
     other_spec = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
@@ -92,14 +92,16 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                 crop_dim=spec_dimension,
                                 power=power)
     other_spec = other_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-    print(f"other_spec shape: {other_spec.shape}")
+    #print(f"other_spec shape: {other_spec.shape}")
     # stack tensors to be [1, 3, 224, 224] shapes:
     # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
     # the 1st dimension is added automatically by the DataLoader below
 
     mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_mix), dim=0)#.unsqueeze(dim=0)
     mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
-    print(f"mix_tensor shape: {mix_tensor.shape}, mask_tensor shape: {mask_tensor.shape}")
+    mix_num_bytes = mix_tensor.element_size() * mix_tensor.numel()
+    mask_num_bytes = mask_tensor.element_size() * mask_tensor.numel()
+    print(f"mix_tensor shape: {mix_tensor.shape} -> {mix_num_bytes} bytes, mask_tensor shape: {mask_tensor.shape} -> {mask_num_bytes} bytes")
     return mix_tensor, mask_tensor, track_name
 
 
@@ -123,7 +125,9 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
               "title": track_name,
               "idx": track_idx}
       
-      torch.save(data, os.path.join(save_dir, f'spectrogram_{track_idx}.pth'))
+      dest = os.path.join(save_dir, f'spectrogram_{track_idx}.pth')
+      print(f"saving {dest}")
+      torch.save(data, dest)
 
 
 # ------------------------------------------------------------------------------------------------
