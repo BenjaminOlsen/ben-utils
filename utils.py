@@ -1,12 +1,135 @@
 import torch
 from tqdm.auto import tqdm
 import matplotlib.pyplot as plt
+import torchaudio
 import torchaudio.transforms as T
 import numpy as np
+import glob
+import os
+
+# ------------------------------------------------------------------------------------------------
+def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length=448,
+        sample_rate=44100, power=1, do_crop=True, crop_dim=(224,224)):
+    
+    track_name = track.name
+    sample_rate = track.rate
+    spec_dimension = crop_dim
+
+    # TODO: try using stereo channels in different ways
+
+    # MIXTURE
+    stem_idx = 0
+    x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
+    
+    print(f"mix waveform shape: {x.shape}")
+    mixture_spec_stereo = get_long_specs(waveform=x,
+                                          n_fft=n_fft,
+                                          win_length=win_length,
+                                          sample_rate=sample_rate,
+                                          do_crop=True,
+                                          crop_dim=spec_dimension,
+                                          power=power)
+    
+    mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
+    print(f"mix spec shape: {mixture_spec_stereo.shape}")
+    
+    x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
+    print(f"mix sum waveform shape: {x.shape}")
+    mixture_spec_mix = get_long_specs(waveform=x,
+                                      n_fft=n_fft,
+                                      win_length=win_length,
+                                      sample_rate=sample_rate,
+                                      do_crop=True,
+                                      crop_dim=spec_dimension,
+                                      power=power)
+    
+    mixture_spec_mix = mixture_spec_mix.permute(1,2,3,0) # channel, time, freq, spec_idx
+    print(f"mix mix spec shape: {mixture_spec_mix.shape}")
+
+    
+    # VOCALS
+    stem_idx = 4
+    x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
+    x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
+    print(f"vocal waveform shape: {x.shape}")
+    vocal_spec = get_long_specs(waveform=x,
+                                n_fft=n_fft,
+                                win_length=win_length,
+                                sample_rate=sample_rate,
+                                do_crop=True,
+                                crop_dim=spec_dimension,
+                                power=power)
+    vocal_spec = vocal_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
+    print(f"vocal_spec shape: {vocal_spec.shape}")
+    # DRUMS
+    stem_idx = 1
+    x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
+    x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
+    print(f"drum waveform shape: {x.shape}")
+    drum_spec = get_long_specs(waveform=x,
+                                n_fft=n_fft,
+                                win_length=win_length,
+                                sample_rate=sample_rate,
+                                do_crop=True,
+                                crop_dim=spec_dimension,
+                                power=power)
+    drum_spec = drum_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
+    print(f"drum_spec shape: {drum_spec.shape}")
+    # OTHER
+    other_stem_idx = 3
+    bass_stem_idx = 2
+    x1 = torch.Tensor(track.stems[other_stem_idx].T).type(torch.float)
+    x1 = (x1[0,:]+x1[1,:]).unsqueeze(dim=0)
+    x2 = torch.Tensor(track.stems[bass_stem_idx].T).type(torch.float)
+    x2 = (x2[0,:]+x2[1,:]).unsqueeze(dim=0)
+    x = (x1 + x2) / 2
+    print(f"other waveform shape: {x.shape}")
+    other_spec = get_long_specs(waveform=x,
+                                n_fft=n_fft,
+                                win_length=win_length,
+                                sample_rate=sample_rate,
+                                do_crop=True,
+                                crop_dim=spec_dimension,
+                                power=power)
+    other_spec = other_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
+    print(f"other_spec shape: {other_spec.shape}")
+    # stack tensors to be [1, 3, 224, 224] shapes:
+    # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
+    # the 1st dimension is added automatically by the DataLoader below
+
+    mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_mix), dim=0)#.unsqueeze(dim=0)
+    mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
+    print(f"mix_tensor shape: {mix_tensor.shape}, mask_tensor shape: {mask_tensor.shape}")
+    return mix_tensor, mask_tensor, track_name
+
+
+# ------------------------------------------------------------------------------------------------
+def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0,
+        hop_length=112, n_fft=448, win_length=448,
+        sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224)):
+    """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
+    
+    for track_idx, track in tqdm(enumerate(musdb_data)):
+      track_name = track.name
+      print(f"Getting spectrograms for track {track_idx}/{len(musdb_data)}: {track_name}")
+      mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
+                                                                          n_fft=n_fft,
+                                                                          win_length=win_length,
+                                                                          sample_rate=sample_rate,
+                                                                          power=power,
+                                                                          do_crop=do_crop,
+                                                                          crop_dim=spec_dimension)
+      data = {"mix_tensor": mix_tensor,
+              "mask_tensor": mask_tensor,
+              "title": track_name,
+              "idx": track_idx}
+      
+      torch.save(data, os.path.join(save_dir, f'spectrogram_{track_idx}.pth'))
+
 
 # ------------------------------------------------------------------------------------------------
 def get_long_specs(waveform, spec_len_in_s=5.0,
-        hop_length=112, n_fft=448, win_length=448,
+        n_fft=448, win_length=448,
         sample_rate=44100, power=1, do_crop=True, crop_dim=(224,224)):
   
   # calculate hop_length so the FFT dimension results as close to crop_dim[0] as possible
@@ -45,11 +168,30 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
 
 
 # ------------------------------------------------------------------------------------------------
+# This class is a lazy-loading version of the SpectrogramDataset
+class SpectrogramDatasetLarge(torch.utils.data.Dataset):
+    def __init__(self, data_path):
+      self_data_path = data_path
+      self.spectrogram_paths = glob.glob(os.path.join(data_path, "*.pth"))
+
+    def __len__(self):
+      return len(self.spectrogram_paths)
+
+    def __getitem__(self, idx):
+      data = torch.load(self.spectrogram_paths[idx])
+      mix_spec = data["mix_tensor"]
+      masks_spec = data["mask_tensor"]
+      track_title = data["title"]
+      track_idx = data["idx"]
+      return mix_spec, masks_spec, track_title, track_idx
+
+# ------------------------------------------------------------------------------------------------
 ## This class creates the spectrograms when initialized with the musdb argument
+## THIS BREAKS, asks for a lot a lot of RAM
 ## power = None -> complex spectrum
 ## power = 1    -> magnitude spectrum
 ## power = 2    -> power spectrum
-class SpectrogramDatasetLarge(torch.utils.data.Dataset):
+class SpectrogramDatasetLarge_FAIL(torch.utils.data.Dataset):
   def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, win_type="hann", spec_dimension=None, power=1):
 
     # We use three channels for the time being because DINOv2 has been trained
@@ -78,102 +220,14 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
     print(f"creating spectrograms with n_fft: {n_fft}, win_length: {win_length}, hop_length: {hop_length}, spec_dimension: {spec_dimension}")
 
     for track_idx, track in tqdm(enumerate(musdb)):
-      track_name = track.name
-      sample_rate = track.rate
-
-      # TODO: try using stereo channels in different ways
-      print(f"Getting spectrograms for track {track_idx}/{len(musdb)}: {track_name}")
-
-      # MIXTURE
-      stem_idx = 0
-      x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
+      mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=5.0,
+                                                                          hop_length=hop_length,
+                                                                          n_fft=n_fft,
+                                                                          win_length=win_length, sample_rate=44100,
+                                                                          power=power,
+                                                                          do_crop=True,
+                                                                          crop_dim=spec_dimension)
       
-      print(f"mix waveform shape: {x.shape}")
-      mixture_spec_stereo = get_long_specs(waveform=x,
-                                            hop_length=hop_length,
-                                            n_fft=n_fft,
-                                            win_length=win_length,
-                                            sample_rate=sample_rate,
-                                            do_crop=True,
-                                            crop_dim=spec_dimension,
-                                            power=power)
-      
-      mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
-      print(f"mix spec shape: {mixture_spec_stereo.shape}")
-      
-      x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-      print(f"mix sum waveform shape: {x.shape}")
-      mixture_spec_mix = get_long_specs(waveform=x,
-                                        hop_length=hop_length,
-                                        n_fft=n_fft,
-                                        win_length=win_length,
-                                        sample_rate=sample_rate,
-                                        do_crop=True,
-                                        crop_dim=spec_dimension,
-                                        power=power)
-      
-      mixture_spec_mix = mixture_spec_mix.permute(1,2,3,0) # channel, time, freq, spec_idx
-      print(f"mix mix spec shape: {mixture_spec_mix.shape}")
-
-      
-      # VOCALS
-      stem_idx = 4
-      x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
-      x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-      print(f"vocal waveform shape: {x.shape}")
-      vocal_spec = get_long_specs(waveform=x,
-                                  hop_length=hop_length,
-                                  n_fft=n_fft,
-                                  win_length=win_length,
-                                  sample_rate=sample_rate,
-                                  do_crop=True,
-                                  crop_dim=spec_dimension,
-                                  power=power)
-      vocal_spec = vocal_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-      print(f"vocal_spec shape: {vocal_spec.shape}")
-      # DRUMS
-      stem_idx = 1
-      x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
-      x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-      print(f"drum waveform shape: {x.shape}")
-      drum_spec = get_long_specs(waveform=x,
-                                  hop_length=hop_length,
-                                  n_fft=n_fft,
-                                  win_length=win_length,
-                                  sample_rate=sample_rate,
-                                  do_crop=True,
-                                  crop_dim=spec_dimension,
-                                  power=power)
-      drum_spec = drum_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-      print(f"drum_spec shape: {drum_spec.shape}")
-      # OTHER
-      other_stem_idx = 3
-      bass_stem_idx = 2
-      x1 = torch.Tensor(track.stems[other_stem_idx].T).type(torch.float)
-      x1 = (x1[0,:]+x1[1,:]).unsqueeze(dim=0)
-      x2 = torch.Tensor(track.stems[bass_stem_idx].T).type(torch.float)
-      x2 = (x2[0,:]+x2[1,:]).unsqueeze(dim=0)
-      x = (x1 + x2) / 2
-      print(f"other waveform shape: {x.shape}")
-      other_spec = get_long_specs(waveform=x,
-                                  hop_length=hop_length,
-                                  n_fft=n_fft,
-                                  win_length=win_length,
-                                  sample_rate=sample_rate,
-                                  do_crop=True,
-                                  crop_dim=spec_dimension,
-                                  power=power)
-      other_spec = other_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
-      print(f"other_spec shape: {other_spec.shape}")
-      # stack tensors to be [1, 3, 224, 224] shapes:
-      # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
-      # the 1st dimension is added automatically by the DataLoader below
-
-      mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_mix), dim=0)#.unsqueeze(dim=0)
-      mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
-      print(f"mix_tensor shape: {mix_tensor.shape}, mask_tensor shape: {mask_tensor.shape}")
-      #TODO: normalize the mask? such that mix_tensor[channel_idx, x, y] = torch.sum(mask_tensor, dim=0)
-      # and/or mask_tensor /= torch.max(max_tensor)
       self.spectrograms.append(mix_tensor)
       self.masks.append(mask_tensor)
       self.titles.append(track_name)
@@ -209,6 +263,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     self.win_type = win_type
 
     #TODO: assumes all audio are the same length, have to modify this:
+    # this turns the entire audio of the track into ONE spectrogram
     audio_sample_cnt = musdb[0].audio.shape[0]
     if spec_dimension is None:
       spec_dimension = (224,224) # default for DINOv2
