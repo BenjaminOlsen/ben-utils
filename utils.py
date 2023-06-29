@@ -111,27 +111,27 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
         sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224), start_idx=0, stop_idx=None, dry_run=False):
     """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
     
-    stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, max(stop_idx, len(musdb_data)))
-    slice = musdb_data[start_idx:stop_idx]
-    for track_idx, track in tqdm(enumerate(slice)):
-      if (track_idx >= start_idx) and (track_idx < stop_idx):
-        track_name = track.name
-        print(f"Getting spectrograms for track {track_idx}/{stop_idx-start_idx}: {track_name}")
-        dest = os.path.join(save_dir, f'spectrogram_{track_idx}.pth')
-        print(f"saving {dest}")
-        if not dry_run:
-          mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
-                                                                              n_fft=n_fft,
-                                                                              win_length=win_length,
-                                                                              sample_rate=sample_rate,
-                                                                              power=power,
-                                                                              do_crop=do_crop,
-                                                                              crop_dim=spec_dimension)
-          data = {"mix_tensor": mix_tensor,
-                  "mask_tensor": mask_tensor,
-                  "title": track_name,
-                  "idx": track_idx}
-          torch.save(data, dest)
+    stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, min(stop_idx, len(musdb_data)))
+
+    spec_type = "complex" if power == None else "magnitude" if power == 1 else "power"
+    for track_idx, track in tqdm(enumerate(musdb_data[start_idx:stop_idx])):
+      track_name = track.name
+      print(f"Getting spectrograms for track {track_idx}/{stop_idx-start_idx}: {track_name}")
+      dest = os.path.join(save_dir, f'spec_{track_idx}_{spec_type}_len{spec_len_in_s}_nfft{n_fft}_win{win_length}_sr22050.pth')
+      print(f"saving {dest}")
+      if not dry_run:
+        mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
+                                                                            n_fft=n_fft,
+                                                                            win_length=win_length,
+                                                                            sample_rate=sample_rate,
+                                                                            power=power,
+                                                                            do_crop=do_crop,
+                                                                            crop_dim=spec_dimension)
+        data = {"mix_tensor": mix_tensor,
+                "mask_tensor": mask_tensor,
+                "title": track_name,
+                "idx": track_idx}
+        torch.save(data, dest)
 
 
 
