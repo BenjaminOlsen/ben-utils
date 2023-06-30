@@ -196,26 +196,18 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
       data = torch.load(self.spectrogram_paths[idx])
-      mix_spec = data["mix_tensor"][2] # use synthetic mixture only
-      
-      #### make mask
-      # do a synthetic mixture
-      # vocal_spec = data["source_tensor"][0] # focus on vocals
-      # drum_spec  = data["source_tensor"][1] # focus on vocals
-      # other_spec = data["source_tensor"][2] # focus on vocals
-
-      mix_spec = mix_spec.unsqueeze(0)
-
+      mix_spec = data["mix_tensor"]
       sources_spec = data["source_tensor"]
+      #### make mask
       epsilon = 1e-10
-      
       # if complex spectrum:
       if sources_spec.dtype is torch.complex64 or sources_spec.dtype is torch.complex32:
         if self.verbose:
           print("__getitem__ - complex spectrum")
         # Wiener filter: 
         masks_spec = torch.square(torch.abs(sources_spec)) + epsilon
-        masks_spec = torch.div(masks_spec, torch.square(torch.abs(mix_spec)) + epsilon) # mask1 = (abs(s1)**2 + eps)/ (abs(mix)**2 + eps)
+        # mix_spec[2] is the synthetic mixture: sum of the sources
+        masks_spec = torch.div(masks_spec, torch.square(torch.abs(mix_spec[2])) + epsilon) # mask1 = (abs(s1)**2 + eps)/ (abs(mix)**2 + eps)
       else: # assume POWER spectrum
         if self.verbose:
           print("__getitem__ - power spectrum")
