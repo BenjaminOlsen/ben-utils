@@ -89,8 +89,8 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_sum), dim=0)#.unsqueeze(dim=0)
     source_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
     mix_num_bytes = mix_tensor.element_size() * mix_tensor.numel()
-    mask_num_bytes = source_tensor.element_size() * source_tensor.numel()
-    mb = (mix_num_bytes + mask_num_bytes) / (1024**2)
+    source_num_bytes = source_tensor.element_size() * source_tensor.numel()
+    mb = (mix_num_bytes + source_num_bytes) / (1024**2)
     print(f"power: {power}; mix_tensor shape: {mix_tensor.shape}, source_tensor shape: {source_tensor.shape} -> {mb} MB")
 
     ### test:
@@ -105,6 +105,8 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     # print_tensor_stats(other, "HORSE'S MOUTH: other tensor")
     # print_tensor_stats(mix, "HORSE'S MOUTH: mix tensor")
     # print_tensor_stats(mask, "HORSE'S MOUTH: mask tensor")
+    print_tensor_stats(mix_tensor, "mix tensor")
+    print_tensor_stats(source_tensor, "mask tensor")
     return mix_tensor, source_tensor, track_name
 
 
@@ -221,10 +223,13 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
       # else: # magnitude spectrum
       #   print("__getitem__ - magnitude spectrum")
       #   masks_spec = torch.div(torch.square(torch.abs(sources_spec)), torch.square(torch.abs(mix_spec)))
-      print_tensor_stats(mix_spec, "SpectrogramDatasetLarge: mix_spec")
-      print_tensor_stats(masks_spec, "SpectrogramDatasetLarge: masks_spec")
+
+      # print_tensor_stats(mix_spec, "SpectrogramDatasetLarge: mix_spec")
+      # print_tensor_stats(masks_spec, "SpectrogramDatasetLarge: masks_spec")
+      
       track_title = data["title"]
       track_idx = data["idx"]
+      
       return mix_spec, masks_spec, track_title, track_idx
 
 # ------------------------------------------------------------------------------------------------
