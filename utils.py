@@ -197,14 +197,16 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
       # N.B. The so called "mask tensor" in the dataset is actually just the sources' spectrograms
       # -> have to maskify it
 
-      # Wiener filter: 
+      
       sources_spec = data["mask_tensor"]
+      epsilon = 1e-8
       # if complex spectrum:
       if sources_spec.dtype is torch.complex64 or sources_spec.dtype is torch.complex32:
         if self.verbose:
           print("__getitem__ - complex spectrum")
-        masks_spec = torch.square(torch.abs(sources_spec))
-        masks_spec = torch.div(masks_spec, torch.square(torch.abs(sources_spec))) # mask1 = abs(s1)**2 / abs(mix)**2
+        # Wiener filter: 
+        masks_spec = torch.square(torch.abs(sources_spec)) + epsilon
+        masks_spec = torch.div(masks_spec, torch.square(torch.abs(sources_spec)) + epsilon) # mask1 = (abs(s1)**2 + eps)/ (abs(mix)**2 + eps)
       else: # assume POWER spectrum
         if self.verbose:
           print("__getitem__ - power spectrum")
