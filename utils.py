@@ -20,7 +20,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
     #print(f"vocal waveform shape: {x.shape}")
-    vocal_spec = get_long_specs(waveform=x,
+    vocal_spec, fft_data = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
                                 sample_rate=sample_rate,
@@ -34,7 +34,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
     #print(f"drum waveform shape: {x.shape}")
-    drum_spec = get_long_specs(waveform=x,
+    drum_spec, _ = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
                                 sample_rate=sample_rate,
@@ -52,7 +52,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x2 = (x2[0,:]+x2[1,:]).unsqueeze(dim=0)
     x = (x1 + x2)
     #print(f"other waveform shape: {x.shape}")
-    other_spec = get_long_specs(waveform=x,
+    other_spec, _ = get_long_specs(waveform=x,
                                 n_fft=n_fft,
                                 win_length=win_length,
                                 sample_rate=sample_rate,
@@ -71,7 +71,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
     
     #print(f"mix waveform shape: {x.shape}")
-    mixture_spec_stereo = get_long_specs(waveform=x,
+    mixture_spec_stereo, _ = get_long_specs(waveform=x,
                                           n_fft=n_fft,
                                           win_length=win_length,
                                           sample_rate=sample_rate,
@@ -107,7 +107,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     # print_tensor_stats(mask, "HORSE'S MOUTH: mask tensor")
     print_tensor_stats(mix_tensor, "mix tensor")
     print_tensor_stats(source_tensor, "mask tensor")
-    return mix_tensor, source_tensor, track_name
+    return mix_tensor, source_tensor, track_name, fft_data
 
 
 # ------------------------------------------------------------------------------------------------
@@ -125,7 +125,7 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
       dest = os.path.join(save_dir, f'spec_{track_idx}_{spec_type}_len{spec_len_in_s}_nfft{n_fft}_win{win_length}_sr22050.pth')
       print(f"saving {dest}")
       if not dry_run:
-        mix_tensor, source_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
+        mix_tensor, source_tensor, track_name, fft_data = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
                                                                             n_fft=n_fft,
                                                                             win_length=win_length,
                                                                             sample_rate=sample_rate,
@@ -134,6 +134,12 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
                                                                             crop_dim=spec_dimension)
         data = {"mix_tensor": mix_tensor,
                 "source_tensor": source_tensor,
+                "n_fft": n_fft,
+                "win_length": win_length,
+                "power": power,
+                "sample_rate": fft_data["sample_rate"],
+                "hop_length": fft_data["hop_length"],
+                "window": fft_data["window"],
                 "title": track_name,
                 "idx": track_idx}
         torch.save(data, dest)
@@ -177,7 +183,14 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
       specs.append(y)
   #print(f"got a list of {len(specs)} spectrograms")
   specs_tensor = torch.stack(specs, dim=0)
-  return specs_tensor
+  data = {"n_fft": n_fft,
+          "win_length": win_length,
+          "hop_length": hop_length,
+          "power": power,
+          "window": window,
+          "sample_rate": resample_rate,
+          "orig_sample_rate": sample_rate}
+  return specs_tensor, data
 
 
 # ------------------------------------------------------------------------------------------------
@@ -186,7 +199,26 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
     def __init__(self, data_path):
       self_data_path = data_path
       self.spectrogram_paths = glob.glob(os.path.join(data_path, "*.pth"))
-      self.verbose = False
+      self.verbose      = False
+      self.n_fft        = None
+      self.win_length   = None
+      self.power        = None
+      self.sample_rate  = None
+      self.hop_length   = None
+      self.window       = None
+      
+      # hacky but ok
+      if len(self.spectrogram_paths) > 0:
+        data = torch.load(self.spectrogram_paths[0])
+        self.set_fft_info(data)
+
+    def set_fft_info(self, data):
+      self.n_fft = data["n_fft"]
+      self.win_length = data["win_length"]
+      self.power = data["power"]
+      self.sample_rate = data["sample_rate"]
+      self.hop_length = data["hop_length"]
+      self.window = data["window"]
 
     def set_verbose(self, verbose=True):
       self.verbose = verbose
@@ -198,6 +230,9 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
       data = torch.load(self.spectrogram_paths[idx])
       mix_spec = data["mix_tensor"]
       sources_spec = data["source_tensor"]
+      if self.n_fft == None:
+        self.set_fft_info(data)
+        
       #### make mask
       epsilon = 1e-10
       # if complex spectrum:
