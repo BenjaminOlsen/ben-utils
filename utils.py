@@ -15,38 +15,6 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     sample_rate = track.rate
     spec_dimension = crop_dim
 
-    # TODO: try using stereo channels in different ways
-
-    # MIXTURE
-    stem_idx = 0
-    x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
-    
-    #print(f"mix waveform shape: {x.shape}")
-    mixture_spec_stereo = get_long_specs(waveform=x,
-                                          n_fft=n_fft,
-                                          win_length=win_length,
-                                          sample_rate=sample_rate,
-                                          do_crop=True,
-                                          crop_dim=spec_dimension,
-                                          power=power)
-    
-    mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
-    #print(f"mix spec shape: {mixture_spec_stereo.shape}")
-    
-    x = (x[0,:]+x[1,:]).unsqueeze(dim=0)
-    #print(f"mix sum waveform shape: {x.shape}")
-    mixture_spec_mix = get_long_specs(waveform=x,
-                                      n_fft=n_fft,
-                                      win_length=win_length,
-                                      sample_rate=sample_rate,
-                                      do_crop=True,
-                                      crop_dim=spec_dimension,
-                                      power=power)
-    
-    mixture_spec_mix = mixture_spec_mix.permute(1,2,3,0) # channel, time, freq, spec_idx
-    #print(f"mix mix spec shape: {mixture_spec_mix.shape}")
-
-    
     # VOCALS
     stem_idx = 4
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
@@ -82,7 +50,7 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     x1 = (x1[0,:]+x1[1,:]).unsqueeze(dim=0)
     x2 = torch.Tensor(track.stems[bass_stem_idx].T).type(torch.float)
     x2 = (x2[0,:]+x2[1,:]).unsqueeze(dim=0)
-    x = (x1 + x2) / 2
+    x = (x1 + x2)
     #print(f"other waveform shape: {x.shape}")
     other_spec = get_long_specs(waveform=x,
                                 n_fft=n_fft,
@@ -97,13 +65,47 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
     # the 1st dimension is added automatically by the DataLoader below
 
-    mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_mix), dim=0)#.unsqueeze(dim=0)
-    mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
+    # TODO: try using stereo channels in different ways
+    # MIXTURE
+    stem_idx = 0
+    x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
+    
+    #print(f"mix waveform shape: {x.shape}")
+    mixture_spec_stereo = get_long_specs(waveform=x,
+                                          n_fft=n_fft,
+                                          win_length=win_length,
+                                          sample_rate=sample_rate,
+                                          do_crop=True,
+                                          crop_dim=spec_dimension,
+                                          power=power)
+    
+    mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
+    #print(f"mix spec shape: {mixture_spec_stereo.shape}")
+    
+    
+    mixture_spec_sum = torch.abs(vocal_spec) + torch.abs(drum_spec) + torch.abs(other_spec)
+    print(f"vocal_spec.shape: {vocal_spec.shape}; drum_spec.shape: {drum_spec.shape}; other_spec.shape: {other_spec.shape}; mixture_spec_sum shape: {mixture_spec_sum.shape}")
+
+    mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_sum), dim=0)#.unsqueeze(dim=0)
+    source_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
     mix_num_bytes = mix_tensor.element_size() * mix_tensor.numel()
-    mask_num_bytes = mask_tensor.element_size() * mask_tensor.numel()
+    mask_num_bytes = source_tensor.element_size() * source_tensor.numel()
     mb = (mix_num_bytes + mask_num_bytes) / (1024**2)
-    print(f"power: {power}; mix_tensor shape: {mix_tensor.shape}, mask_tensor shape: {mask_tensor.shape} -> {mb} MB")
-    return mix_tensor, mask_tensor, track_name
+    print(f"power: {power}; mix_tensor shape: {mix_tensor.shape}, source_tensor shape: {source_tensor.shape} -> {mb} MB")
+
+    ### test:
+    # voc = source_tensor[0]
+    # drum = source_tensor[1]
+    # other = source_tensor[2]
+    # mix = abs(voc) + abs(drum) + abs(other)
+    # mask = (torch.abs(voc)**2+1e-10)/(torch.abs(mix)**2+1e-10)
+    # #mask = torch.clamp(mask, max=1.0)
+    # print_tensor_stats(voc, "HORSE'S MOUTH: vocal tensor")
+    # print_tensor_stats(drum, "HORSE'S MOUTH: drum tensor")
+    # print_tensor_stats(other, "HORSE'S MOUTH: other tensor")
+    # print_tensor_stats(mix, "HORSE'S MOUTH: mix tensor")
+    # print_tensor_stats(mask, "HORSE'S MOUTH: mask tensor")
+    return mix_tensor, source_tensor, track_name
 
 
 # ------------------------------------------------------------------------------------------------
@@ -121,7 +123,7 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
       dest = os.path.join(save_dir, f'spec_{track_idx}_{spec_type}_len{spec_len_in_s}_nfft{n_fft}_win{win_length}_sr22050.pth')
       print(f"saving {dest}")
       if not dry_run:
-        mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
+        mix_tensor, source_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=spec_len_in_s,
                                                                             n_fft=n_fft,
                                                                             win_length=win_length,
                                                                             sample_rate=sample_rate,
@@ -129,7 +131,7 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
                                                                             do_crop=do_crop,
                                                                             crop_dim=spec_dimension)
         data = {"mix_tensor": mix_tensor,
-                "mask_tensor": mask_tensor,
+                "source_tensor": source_tensor,
                 "title": track_name,
                 "idx": track_idx}
         torch.save(data, dest)
@@ -192,14 +194,19 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
       data = torch.load(self.spectrogram_paths[idx])
-      mix_spec = data["mix_tensor"]
-
-      # N.B. The so called "mask tensor" in the dataset is actually just the sources' spectrograms
-      # -> have to maskify it
-
+      mix_spec = data["mix_tensor"][2] # use synthetic mixture only
       
-      sources_spec = data["mask_tensor"]
-      epsilon = 1e-8
+      #### make mask
+      # do a synthetic mixture
+      # vocal_spec = data["source_tensor"][0] # focus on vocals
+      # drum_spec  = data["source_tensor"][1] # focus on vocals
+      # other_spec = data["source_tensor"][2] # focus on vocals
+
+      mix_spec = mix_spec.unsqueeze(0)
+
+      sources_spec = data["source_tensor"]
+      epsilon = 1e-10
+      
       # if complex spectrum:
       if sources_spec.dtype is torch.complex64 or sources_spec.dtype is torch.complex32:
         if self.verbose:
@@ -214,7 +221,8 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
       # else: # magnitude spectrum
       #   print("__getitem__ - magnitude spectrum")
       #   masks_spec = torch.div(torch.square(torch.abs(sources_spec)), torch.square(torch.abs(mix_spec)))
-    
+      print_tensor_stats(mix_spec, "SpectrogramDatasetLarge: mix_spec")
+      print_tensor_stats(masks_spec, "SpectrogramDatasetLarge: masks_spec")
       track_title = data["title"]
       track_idx = data["idx"]
       return mix_spec, masks_spec, track_title, track_idx
@@ -235,7 +243,7 @@ class SpectrogramDatasetLarge_FAIL(torch.utils.data.Dataset):
     self.spectrograms = []
 
     # three channel masks: vocals, drums, other+bass
-    self.masks = []
+    self.sources = []
     self.titles = []
     self.sample_rate = 44100
     self.hop_length = hop_length
@@ -254,7 +262,7 @@ class SpectrogramDatasetLarge_FAIL(torch.utils.data.Dataset):
     print(f"creating spectrograms with n_fft: {n_fft}, win_length: {win_length}, hop_length: {hop_length}, spec_dimension: {spec_dimension}")
 
     for track_idx, track in tqdm(enumerate(musdb)):
-      mix_tensor, mask_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=5.0,
+      mix_tensor, source_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=5.0,
                                                                           hop_length=hop_length,
                                                                           n_fft=n_fft,
                                                                           win_length=win_length, sample_rate=44100,
@@ -263,13 +271,13 @@ class SpectrogramDatasetLarge_FAIL(torch.utils.data.Dataset):
                                                                           crop_dim=spec_dimension)
       
       self.spectrograms.append(mix_tensor)
-      self.masks.append(mask_tensor)
+      self.sources.append(source_tensor)
       self.titles.append(track_name)
 
   def __len__(self):
     return len(self.spectrograms)
   def __getitem__(self, i):
-    return self.spectrograms[i], self.masks[i], self.titles[i]
+    return self.spectrograms[i], self.sources[i], self.titles[i]
 
 
 
@@ -383,12 +391,12 @@ class SpectrogramDataset(torch.utils.data.Dataset):
       # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
       # the 1st dimension is added automatically by the DataLoader below
       mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_mix), dim=0)#.unsqueeze(dim=0)
-      mask_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
+      source_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
 
-      #TODO: normalize the mask? such that mix_tensor[channel_idx, x, y] = torch.sum(mask_tensor, dim=0)
-      # and/or mask_tensor /= torch.max(max_tensor)
+      #TODO: normalize the mask? such that mix_tensor[channel_idx, x, y] = torch.sum(source_tensor, dim=0)
+      # and/or source_tensor /= torch.max(max_tensor)
       self.spectrograms.append(mix_tensor)
-      self.masks.append(mask_tensor)
+      self.masks.append(source_tensor)
       self.titles.append(track_name)
 
   def __len__(self):
@@ -692,9 +700,10 @@ def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, 
 # ------------------------------------------------------------------------------------------------
 def print_tensor_stats(t, title=None):
   tensor_type = t.dtype
+  shape = t.shape
   t = torch.abs(t)
   max = torch.max(t)
   min = torch.min(t)
   mean = torch.mean(t)
   std = torch.std(t)
-  print(f"{title} - {tensor_type} (magnitude) max: {max:.4f}, min {min:.4f}, mean {mean:.4f}, std: {std:.4f}")
+  print(f"{title} - {tensor_type} - shape: {shape} (magnitude) max: {max:.4f}, min {min:.4f}, mean {mean:.4f}, std: {std:.4f}")
