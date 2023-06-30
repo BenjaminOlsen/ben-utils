@@ -206,7 +206,7 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
           print("__getitem__ - complex spectrum")
         # Wiener filter: 
         masks_spec = torch.square(torch.abs(sources_spec)) + epsilon
-        masks_spec = torch.div(masks_spec, torch.square(torch.abs(sources_spec)) + epsilon) # mask1 = (abs(s1)**2 + eps)/ (abs(mix)**2 + eps)
+        masks_spec = torch.div(masks_spec, torch.square(torch.abs(mix_spec)) + epsilon) # mask1 = (abs(s1)**2 + eps)/ (abs(mix)**2 + eps)
       else: # assume POWER spectrum
         if self.verbose:
           print("__getitem__ - power spectrum")
