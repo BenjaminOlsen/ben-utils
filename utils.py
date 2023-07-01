@@ -616,8 +616,8 @@ def get_spectrogram_from_waveform(waveform,
 def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
-  mix_spec = mix_spec.squeeze().numpy() # gives [3, 224, 224]
-  mask_spec = mask_spec.squeeze().numpy()
+  mix_spec = mix_spec.squeeze(0).numpy() # gives [3, 224, 224]
+  mask_spec = mask_spec.squeeze(0).numpy()
   num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
   num_freq_bins = len(mix_spec[0,0,:]) # double check this...
 
@@ -644,8 +644,8 @@ def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, ti
 def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
-  mix_spec = mix_spec.squeeze().numpy() # gives [1, 224, 224]
-  mask_spec = mask_spec.squeeze().numpy()
+  mix_spec = mix_spec.squeeze(0).numpy() # gives [1, 224, 224]
+  mask_spec = mask_spec.squeeze(0).numpy()
   num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
   num_freq_bins = len(mix_spec[0,0,:]) # double check this...
 
