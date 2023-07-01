@@ -641,6 +641,29 @@ def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, ti
   fig.suptitle(title)
 
 # ------------------------------------------------------------------------------------------------
+def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
+  mix_spec = torch.log(torch.abs(mix_spec))
+  mask_spec = torch.log(torch.abs(mask_spec))
+  mix_spec = mix_spec.squeeze().numpy() # gives [1, 224, 224]
+  mask_spec = mask_spec.squeeze().numpy()
+  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
+  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+
+  plt.figure(figsize=(18, 15))
+  fig, axes = plt.subplots(1,4)
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)
+  times = np.arange(num_frames) * hop_length / sample_rate
+
+  axes[0].pcolormesh(times, freqs, mix_spec[0,:,:], shading='auto')
+  axes[1].pcolormesh(times, freqs, mask_spec[0,:,:], shading='auto')
+  axes[2].pcolormesh(times, freqs, mask_spec[1,:,:], shading='auto')
+  axes[3].pcolormesh(times, freqs, mask_spec[2,:,:], shading='auto')
+  axes[0].set_title("mix")
+  axes[1].set_title("vocal")
+  axes[2].set_title("drum")
+  axes[3].set_title("other+bass")
+  fig.suptitle(title)
+# ------------------------------------------------------------------------------------------------
 def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
