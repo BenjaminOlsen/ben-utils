@@ -613,7 +613,7 @@ def get_spectrogram_from_waveform(waveform,
   return y
 
 # ------------------------------------------------------------------------------------------------
-def plot_spec_tensors_3(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
+def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
   plot_mix_mask(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title")
 
 # ------------------------------------------------------------------------------------------------
