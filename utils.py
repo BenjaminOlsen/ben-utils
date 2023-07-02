@@ -485,12 +485,12 @@ def plot_complex_spectrogram(spec, sample_rate=22050, hop_length=112, title=None
   mag_spec = torch.log(torch.abs(spec))
   phase_spec = torch.angle(spec)
 
-  num_frames = len(spec[:,0]) # double check this... might be flipped
-  num_freq_bins = len(spec[0,:]) # double check this...
+  num_frames = len(spec[:,0]) 
+  num_freq_bins = len(spec[0,:]) 
 
   fig, axes = plt.subplots(1,2)
-  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  # replace sr with your sample rate
-  times = np.arange(num_frames) * hop_length / sample_rate  # replace hop_length with your hop length
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  
+  times = np.arange(num_frames) * hop_length / sample_rate  
 
   axes[0].pcolormesh(times, freqs, mag_spec, shading='auto')
   axes[1].pcolormesh(phase_spec, shading='auto')
@@ -534,8 +534,8 @@ def plot_spectrogram(spec, n_fft, hop_length, sample_rate=44100):
   #print(f"frame_time: {frame_time}, num_frames: {num_frames}")
   
   fig, ax = plt.subplots()
-  freqs = np.linspace(0, sample_rate/2, spec.shape[0])  # replace sr with your sample rate
-  times = np.arange(spec.shape[1]) * hop_length / sample_rate  # replace hop_length with your hop length
+  freqs = np.linspace(0, sample_rate/2, spec.shape[0])  
+  times = np.arange(spec.shape[1]) * hop_length / sample_rate  
   ax.pcolormesh(list(range(len(spec[0,:])+1)), list(range(len(spec[:,0])+1)), spec, shading='auto')
   print(f"spec.shape: {spec.T.shape}, num_frames: {num_frames}, dur: {hop_length*num_frames/sample_rate}")
 
@@ -618,8 +618,8 @@ def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, ti
   mask_spec = torch.log(torch.abs(mask_spec))
   mix_spec = mix_spec.squeeze(0).numpy() # gives [3, 224, 224]
   mask_spec = mask_spec.squeeze(0).numpy()
-  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
-  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+  num_frames = len(mix_spec[0,:,0]) 
+  num_freq_bins = len(mix_spec[0,0,:]) 
 
   plt.figure(figsize=(18, 15))
   fig, axes = plt.subplots(3,2)
@@ -646,8 +646,8 @@ def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=
   mask_spec = torch.log(torch.abs(mask_spec))
   mix_spec = mix_spec.squeeze(0).numpy() # gives [1, 224, 224]
   mask_spec = mask_spec.squeeze(0).numpy()
-  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
-  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+  num_frames = len(mix_spec[0,:,0]) 
+  num_freq_bins = len(mix_spec[0,0,:]) 
 
   plt.figure(figsize=(18, 15))
   fig, axes = plt.subplots(1,4)
@@ -663,8 +663,13 @@ def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=
   axes[2].set_title("drum")
   axes[3].set_title("other+bass")
   fig.suptitle(title)
+
 # ------------------------------------------------------------------------------------------------
 def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
+  plot_mix_mask_pred_3(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title")
+
+# ------------------------------------------------------------------------------------------------
+def plot_mix_mask_pred_3(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
   preds = torch.log(torch.abs(preds))
@@ -672,8 +677,8 @@ def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, 
   mask_spec = mask_spec.squeeze().numpy()
   preds = preds.squeeze().numpy()
 
-  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
-  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+  num_frames = len(mix_spec[0,:,0]) 
+  num_freq_bins = len(mix_spec[0,0,:])
 
   plt.figure(figsize=(18, 15))
   fig, axes = plt.subplots(3,3)
@@ -702,6 +707,41 @@ def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, 
   fig.suptitle(title)
 
 # ------------------------------------------------------------------------------------------------
+"""
+this is to compare a mix, a mask, and a prediction spectrogram.
+"""
+def plot_mix_mask_pred(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
+  mix_spec = torch.log(torch.abs(mix_spec))
+  mask_spec = torch.log(torch.abs(mask_spec))
+  preds = torch.log(torch.abs(preds))
+  mix_spec = mix_spec.squeeze().numpy() # gives [3, 224, 224]
+  mask_spec = mask_spec.squeeze().numpy()
+  preds = preds.squeeze().numpy()
+
+  num_frames = len(mix_spec[0,:,0]) 
+  num_freq_bins = len(mix_spec[0,0,:])
+
+  fig, axes = plt.subplots(3)
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)
+  times = np.arange(num_frames) * hop_length / sample_rate
+
+  axes[0].pcolormesh(times, freqs, mix_spec[0,:,:], shading='auto')
+  axes[0,1].pcolormesh(times, freqs, mask_spec[0,:,:], shading='auto')
+  axes[0,2].pcolormesh(times, freqs, preds[0,:,:], shading='auto')
+
+
+  axes[0,0].set_title("mix ch1")
+  axes[1,0].set_title("mix ch2")
+  axes[2,0].set_title("mix mix")
+  axes[0,1].set_title("vocal mask")
+  axes[1,1].set_title("drum mask")
+  axes[2,1].set_title("other+bass mask")
+  axes[0,2].set_title("vocal pred")
+  axes[1,2].set_title("drum pred")
+  axes[2,2].set_title("other+bass pred")
+  fig.suptitle(title)
+
+# ------------------------------------------------------------------------------------------------
 def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
@@ -716,13 +756,13 @@ def plot_mix_mask_sources(mix_spec, sources_spec, mask_spec, sample_rate=22050, 
   min_val = 0 #np.amin(np.maximum(mix_spec, np.minimum(mask_spec, np.minimum(sources_spec, filtered_spec))))
   print(f"plot_mix_mask_sources: max_val : {max_val}, min_val: {min_val}")
 
-  num_frames = len(mix_spec[0,:,0]) # double check this... might be flipped
-  num_freq_bins = len(mix_spec[0,0,:]) # double check this...
+  num_frames = len(mix_spec[0,:,0]) 
+  num_freq_bins = len(mix_spec[0,0,:])
 
   plt.figure(figsize=(35, 25), dpi=70)
   fig, axes = plt.subplots(3,4)
-  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  # replace sr with your sample rate
-  times = np.arange(num_frames) * hop_length / sample_rate  # replace hop_length with your hop length
+  freqs = np.linspace(0, sample_rate/2, num_freq_bins)  
+  times = np.arange(num_frames) * hop_length / sample_rate  
 
   axes[0,0].pcolormesh(times, freqs, mix_spec[0,:,:], shading='auto', vmin=0, vmax=max_val)
   axes[1,0].pcolormesh(times, freqs, mix_spec[1,:,:], shading='auto', vmin=0, vmax=max_val)
