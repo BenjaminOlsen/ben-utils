@@ -612,9 +612,7 @@ def get_spectrogram_from_waveform(waveform,
     y = y[:,:crop_dim[0],:crop_dim[1]]
   return y
 
-# ------------------------------------------------------------------------------------------------
-def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
-  plot_mix_mask(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title")
+
 
 # ------------------------------------------------------------------------------------------------
 def plot_mix_mask(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
@@ -668,6 +666,10 @@ def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=
   axes[3].set_title("other+bass")
   fig.suptitle(title)
 
+# ------------------------------------------------------------------------------------------------
+def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
+  plot_mix_mask(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title")
+  
 # ------------------------------------------------------------------------------------------------
 def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
   plot_mix_mask_pred_3(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title")
