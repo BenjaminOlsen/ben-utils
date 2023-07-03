@@ -257,59 +257,7 @@ class SpectrogramDatasetLarge(torch.utils.data.Dataset):
       track_title = data["title"]
       track_idx = data["idx"]
       
-      return mix_spec, masks_spec, track_title, track_idx
-
-# ------------------------------------------------------------------------------------------------
-## This class creates the spectrograms when initialized with the musdb argument
-## THIS BREAKS, asks for a lot a lot of RAM
-## power = None -> complex spectrum
-## power = 1    -> magnitude spectrum
-## power = 2    -> power spectrum
-class SpectrogramDatasetLarge_FAIL(torch.utils.data.Dataset):
-  def __init__(self, musdb, split=None, hop_length=112, n_fft=448, win_length=448, win_type="hann", spec_dimension=None, power=1):
-
-    # We use three channels for the time being because DINOv2 has been trained
-    # on RGB image data
-
-    # the mixture spectrograms
-    self.spectrograms = []
-
-    # three channel masks: vocals, drums, other+bass
-    self.sources = []
-    self.titles = []
-    self.sample_rate = 44100
-    self.hop_length = hop_length
-    self.n_fft = n_fft
-    self.win_length = win_length
-    self.win_type = win_type
-
-    #TODO: assumes all audio are the same length, have to modify this:
-    audio_sample_cnt = musdb[0].audio.shape[0]
-    if spec_dimension is None:
-      spec_dimension = (224,224) # default for DINOv2
-    else:
-      n_fft = 2 * spec_dimension[1]
-      hop_length=int(audio_sample_cnt / (2 * spec_dimension[0]))
-
-    print(f"creating spectrograms with n_fft: {n_fft}, win_length: {win_length}, hop_length: {hop_length}, spec_dimension: {spec_dimension}")
-
-    for track_idx, track in tqdm(enumerate(musdb)):
-      mix_tensor, source_tensor, track_name = make_spectrograms_from_track(track, spec_len_in_s=5.0,
-                                                                          hop_length=hop_length,
-                                                                          n_fft=n_fft,
-                                                                          win_length=win_length, sample_rate=44100,
-                                                                          power=power,
-                                                                          do_crop=True,
-                                                                          crop_dim=spec_dimension)
-      
-      self.spectrograms.append(mix_tensor)
-      self.sources.append(source_tensor)
-      self.titles.append(track_name)
-
-  def __len__(self):
-    return len(self.spectrograms)
-  def __getitem__(self, i):
-    return self.spectrograms[i], self.sources[i], self.titles[i]
+      return mix_spec, sources_spec, masks_spec, track_title, track_idx
 
 
 
@@ -669,7 +617,7 @@ def plot_spec_tensors_single(mix_spec, mask_spec, sample_rate=22050, hop_length=
 # ------------------------------------------------------------------------------------------------
 def plot_spec_tensors(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title"):
   plot_mix_mask(mix_spec, mask_spec, sample_rate=22050, hop_length=112, title="title")
-  
+
 # ------------------------------------------------------------------------------------------------
 def plot_compare(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title"):
   plot_mix_mask_pred_3(mix_spec, mask_spec, preds, sample_rate=22050, hop_length=112, title="title")
@@ -732,19 +680,13 @@ def plot_mix_mask_pred(mix_spec, mask_spec, preds, sample_rate=22050, hop_length
   times = np.arange(num_frames) * hop_length / sample_rate
 
   axes[0].pcolormesh(times, freqs, mix_spec[0,:,:], shading='auto')
-  axes[0,1].pcolormesh(times, freqs, mask_spec[0,:,:], shading='auto')
-  axes[0,2].pcolormesh(times, freqs, preds[0,:,:], shading='auto')
+  axes[1].pcolormesh(times, freqs, mask_spec[0,:,:], shading='auto')
+  axes[2].pcolormesh(times, freqs, preds[0,:,:], shading='auto')
 
-
-  axes[0,0].set_title("mix ch1")
-  axes[1,0].set_title("mix ch2")
-  axes[2,0].set_title("mix mix")
-  axes[0,1].set_title("vocal mask")
-  axes[1,1].set_title("drum mask")
-  axes[2,1].set_title("other+bass mask")
-  axes[0,2].set_title("vocal pred")
-  axes[1,2].set_title("drum pred")
-  axes[2,2].set_title("other+bass pred")
+  axes[0].set_title("mix")
+  axes[1].set_title("mask")
+  axes[2].set_title("pred")
+    
   fig.suptitle(title)
 
 # ------------------------------------------------------------------------------------------------
