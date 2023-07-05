@@ -165,9 +165,12 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
   win_length = int(win_length)
   window = torch.hann_window(win_length)
   spec = torch.stft(n_fft=n_fft,
-                      win_length=win_length,
-                      hop_length=hop_length,
-                      power=power) # power=None for complex spectrum; 1: mag; 2: power
+                    win_length=win_length,
+                    window=torch.hann_window(win_length),
+                    center=True,
+                    hop_length=hop_length,
+                    onesided=True,
+                    return_complex=True) 
   
   #print(f"resampled at: {resample_rate} Hz")
   resampler = T.Resample(sample_rate, resample_rate, dtype=waveform.dtype)
@@ -418,14 +421,13 @@ def griffin_lim(mag_spec, n_fft, hop_length, win_length, window, num_iters=100):
             window=window
         )
         if _ != num_iters - 1:
-            spec = torch.stft(
-                waveform,
-                n_fft=n_fft,
-                hop_length=hop_length,
-                win_length=win_length,
-                window=window,
-                return_complex=True
-            )
+            spec = torch.stft(n_fft=n_fft,
+                    win_length=win_length,
+                    window=torch.hann_window(win_length),
+                    center=True,
+                    hop_length=hop_length,
+                    onesided=True,
+                    return_complex=True)
             phase = torch.angle(spec)
             spec = mag_spec * torch.exp(1j * phase)
         
@@ -547,10 +549,13 @@ def get_spectrogram_from_waveform(waveform,
   n_fft=int(n_fft)
   win_length=int(win_length)
   window=torch.hann_window(win_length)
-  spec = torch.stft(n_fft=n_fft, 
-                      win_length=win_length,
-                      hop_length=hop_length,
-                      power=power) # power=None for complex spectrum; 1: mag; 2: power
+  spec = torch.stft(n_fft=n_fft,
+                    win_length=win_length,
+                    window=torch.hann_window(win_length),
+                    center=True,
+                    hop_length=hop_length,
+                    onesided=True,
+                    return_complex=True)
 
   resample_rate = int(44100/2)
   #print(f"resampled at: {resample_rate} Hz")
