@@ -164,7 +164,7 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
   n_fft = int(n_fft)
   win_length = int(win_length)
   window = torch.hann_window(win_length)
-  spec = T.stft(n_fft=n_fft,
+  spec = torch.stft(n_fft=n_fft,
                       win_length=win_length,
                       hop_length=hop_length,
                       power=power) # power=None for complex spectrum; 1: mag; 2: power
@@ -547,7 +547,7 @@ def get_spectrogram_from_waveform(waveform,
   n_fft=int(n_fft)
   win_length=int(win_length)
   window=torch.hann_window(win_length)
-  spec = T.stft(n_fft=n_fft, 
+  spec = torch.stft(n_fft=n_fft, 
                       win_length=win_length,
                       hop_length=hop_length,
                       power=power) # power=None for complex spectrum; 1: mag; 2: power
