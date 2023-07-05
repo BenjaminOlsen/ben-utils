@@ -164,13 +164,6 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
   n_fft = int(n_fft)
   win_length = int(win_length)
   window = torch.hann_window(win_length)
-  spec = torch.stft(n_fft=n_fft,
-                    win_length=win_length,
-                    window=torch.hann_window(win_length),
-                    center=True,
-                    hop_length=hop_length,
-                    onesided=True,
-                    return_complex=True) 
   
   #print(f"resampled at: {resample_rate} Hz")
   resampler = T.Resample(sample_rate, resample_rate, dtype=waveform.dtype)
@@ -184,7 +177,14 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
   #print(f"making specs: n_fft: {n_fft}, hop_length: {hop_length}, win_length: {win_length}, do_crop: {do_crop}, seg_length: {seg_length}, num_segs: {num_segs}, waveform_resampled.shape: {waveform_resampled.shape}, waveform_segments len: {len(waveform_segments)}")
   specs = []
   for seg in waveform_segments:
-      y = spec(seg)
+      y = torch.stft( input=seg,
+                      n_fft=n_fft,
+                      win_length=win_length,
+                      window=window,
+                      center=True,
+                      hop_length=hop_length,
+                      onesided=True,
+                      return_complex=True)
       #print(f"spec shape: {y.shape}")
       if do_crop:
           y = y[:, :crop_dim[0],:crop_dim[1]]
@@ -421,13 +421,14 @@ def griffin_lim(mag_spec, n_fft, hop_length, win_length, window, num_iters=100):
             window=window
         )
         if _ != num_iters - 1:
-            spec = torch.stft(n_fft=n_fft,
-                    win_length=win_length,
-                    window=torch.hann_window(win_length),
-                    center=True,
-                    hop_length=hop_length,
-                    onesided=True,
-                    return_complex=True)
+            spec = torch.stft(input=waveform,
+                              n_fft=n_fft,
+                              win_length=win_length,
+                              window=torch.hann_window(win_length),
+                              center=True,
+                              hop_length=hop_length,
+                              onesided=True,
+                              return_complex=True)
             phase = torch.angle(spec)
             spec = mag_spec * torch.exp(1j * phase)
         
@@ -549,19 +550,19 @@ def get_spectrogram_from_waveform(waveform,
   n_fft=int(n_fft)
   win_length=int(win_length)
   window=torch.hann_window(win_length)
-  spec = torch.stft(n_fft=n_fft,
-                    win_length=win_length,
-                    window=torch.hann_window(win_length),
-                    center=True,
-                    hop_length=hop_length,
-                    onesided=True,
-                    return_complex=True)
 
   resample_rate = int(44100/2)
   #print(f"resampled at: {resample_rate} Hz")
   resampler = T.Resample(sample_rate, resample_rate, dtype=waveform.dtype)
   waveform_resampled = resampler(waveform)
-  y = spec(waveform_resampled)
+  y = torch.stft(   input=waveform_resampled,
+                    n_fft=n_fft,
+                    win_length=win_length,
+                    window=window,
+                    center=True,
+                    hop_length=hop_length,
+                    onesided=True,
+                    return_complex=True)
   #print(f"y.type: {y.type}")
   #y = torch.log(y)
   #print(f"y.shape before crop: {y.shape}")
