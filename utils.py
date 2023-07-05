@@ -60,12 +60,11 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
                                 crop_dim=spec_dimension,
                                 power=power)
     other_spec = other_spec.permute(1,2,3,0) # channel, time, freq, spec_idx
+
     #print(f"other_spec shape: {other_spec.shape}")
-    # stack tensors to be [1, 3, 224, 224] shapes:
-    # ACTUALLY: just [3,224,224] is ok? for four dimensions, do unsqueeze, but
-    # the 1st dimension is added automatically by the DataLoader below
 
     # TODO: try using stereo channels in different ways
+    #######################################################################
     # MIXTURE
     stem_idx = 0
     x = torch.Tensor(track.stems[stem_idx].T).type(torch.float)
@@ -82,12 +81,15 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
     mixture_spec_stereo = mixture_spec_stereo.permute(1,2,3,0) # channel, time, freq, spec_idx
     #print(f"mix spec shape: {mixture_spec_stereo.shape}")
     
-    
+    # make the 3rd tensor a linear sum of the magnitudes - this is CHEATING because it is
+    # not representative of real-world mixtures, but it makes separation easier due to its linearity.
     mixture_spec_sum = torch.abs(vocal_spec) + torch.abs(drum_spec) + torch.abs(other_spec)
     print(f"vocal_spec.shape: {vocal_spec.shape}; drum_spec.shape: {drum_spec.shape}; other_spec.shape: {other_spec.shape}; mixture_spec_sum shape: {mixture_spec_sum.shape}")
 
-    mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_sum), dim=0)#.unsqueeze(dim=0)
-    source_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)#.unsqueeze(dim=0)
+    ###### these are the key tensors: the mix and the 3 sources
+    mix_tensor = torch.cat((mixture_spec_stereo, mixture_spec_sum), dim=0)
+    source_tensor = torch.cat((vocal_spec, drum_spec, other_spec), dim=0)
+
     mix_num_bytes = mix_tensor.element_size() * mix_tensor.numel()
     source_num_bytes = source_tensor.element_size() * source_tensor.numel()
     mb = (mix_num_bytes + source_num_bytes) / (1024**2)
@@ -113,7 +115,9 @@ def make_spectrograms_from_track(track, spec_len_in_s=5.0, n_fft=448, win_length
 # ------------------------------------------------------------------------------------------------
 def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, win_length=448,
         sample_rate=44100, power=1, do_crop=True, spec_dimension=(224,224), start_idx=0, stop_idx=None, dry_run=False):
-    """saves all tracks in a musdb reference to a track-by-track spectrogram tensor"""
+    """
+    saves all tracks in a musdb reference to a track-by-track spectrogram tensor
+    """
     
     stop_idx = len(musdb_data) if stop_idx is None else max(start_idx, min(stop_idx, len(musdb_data)))
 
@@ -142,6 +146,7 @@ def save_musdb_spectrograms(musdb_data, save_dir, spec_len_in_s=5.0, n_fft=448, 
                 "window": fft_data["window"],
                 "title": track_name,
                 "idx": track_idx}
+        
         torch.save(data, dest)
 
 
@@ -159,7 +164,7 @@ def get_long_specs(waveform, spec_len_in_s=5.0,
   n_fft = int(n_fft)
   win_length = int(win_length)
   window = torch.hann_window(win_length)
-  spec = T.Spectrogram(n_fft=n_fft,
+  spec = T.stft(n_fft=n_fft,
                       win_length=win_length,
                       hop_length=hop_length,
                       power=power) # power=None for complex spectrum; 1: mag; 2: power
@@ -542,7 +547,7 @@ def get_spectrogram_from_waveform(waveform,
   n_fft=int(n_fft)
   win_length=int(win_length)
   window=torch.hann_window(win_length)
-  spec = T.Spectrogram(n_fft=n_fft, 
+  spec = T.stft(n_fft=n_fft, 
                       win_length=win_length,
                       hop_length=hop_length,
                       power=power) # power=None for complex spectrum; 1: mag; 2: power
@@ -668,7 +673,7 @@ def plot_mix_mask_pred(mix_spec, mask_spec, preds, sample_rate=22050, hop_length
   mix_spec = torch.log(torch.abs(mix_spec))
   mask_spec = torch.log(torch.abs(mask_spec))
   preds = torch.log(torch.abs(preds))
-  mix_spec = mix_spec.squeeze().numpy() # gives [3, 224, 224]
+  mix_spec = mix_spec.squeeze().numpy() 
   mask_spec = mask_spec.squeeze().numpy()
   preds = preds.squeeze().numpy()
 
